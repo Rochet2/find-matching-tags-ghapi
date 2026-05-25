@@ -29,6 +29,6 @@ outputs:
   tags:
     description: 'JSON array of the matched tags'
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'index.js'
 
