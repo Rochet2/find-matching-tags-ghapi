@@ -94,14 +94,69 @@ If you want to pin to an exact release instead, use the full tag (`@v1.2.0`) or 
 
 The `v<MAJOR>` tag is moved automatically by `.github/workflows/release.yml` whenever a `vX.Y.Z` release is published.
 
-## Development
+## Maintainer guide
 
-The action is bundled with [`@vercel/ncc`](https://github.com/vercel/ncc) into `dist/index.js` so it can run without `node_modules`. After editing `index.js`:
+### Repository layout
+
+| Path                          | Purpose                                                                |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| `index.js`                    | Action source (ESM).                                                   |
+| `dist/index.js`               | Bundled output that the action runtime actually executes.              |
+| `action.yml`                  | Action metadata (inputs, outputs, runtime, branding).                  |
+| `.github/workflows/test.yml`  | CI: verifies `dist/` is in sync and runs end-to-end tests on every push and PR. |
+| `.github/workflows/install.yml` | Manual workflow that rebuilds `dist/` on the default branch and commits it. |
+| `.github/workflows/release.yml` | Auto-moves the `vMAJOR` tag whenever a `vX.Y.Z` GitHub Release is published. |
+| `.github/dependabot.yml`      | Weekly `github-actions` updates, monthly `npm` updates.                |
+
+### Development loop
+
+The action is bundled with [`@vercel/ncc`](https://github.com/vercel/ncc) so it can run without `node_modules`. After editing `index.js`:
 
 ```sh
 npm ci
 npm run build
 git add dist
+git commit -m "..."
 ```
 
-CI will fail if `dist/` is not in sync with `index.js`.
+CI (`verify_build` job in `test.yml`) fails if `dist/` is not in sync with `index.js`, so always rebuild before pushing.
+
+Source maps are intentionally disabled (`ncc` embeds absolute source paths in `*.map`, which breaks reproducibility across machines).
+
+### Tests
+
+`test.yml` runs on every `push` and `pull_request` and contains two jobs:
+
+1. `verify_build` — runs `npm ci && npm run build` and fails if it produces any diff under `dist/`.
+2. `filter_tags_job` — invokes the local action (`uses: ./`) against this repo's own `TEST-*` tags and asserts on the outputs with plain shell (no third-party assertion action).
+
+There are no separate unit tests; the integration job above covers the full path.
+
+### Cutting a release
+
+1. Make sure `main` is green and `dist/` is up to date.
+2. Decide the next version following semver:
+   - Patch (`vX.Y.Z+1`) — bug fixes, no input/output changes.
+   - Minor (`vX.Y+1.0`) — backward-compatible additions (new optional input/output, new behavior gated behind a default).
+   - Major (`vX+1.0.0`) — anything that can break existing consumers (removed/renamed input, changed default, runtime bump).
+3. On GitHub, go to **Releases → Draft a new release**:
+   - Tag: `vX.Y.Z` (target `main`, create new tag).
+   - Title: `vX.Y.Z` (or a short summary).
+   - Notes: auto-generate is fine; edit as needed.
+   - Click **Publish release**.
+4. `release.yml` triggers on the `release: [published]` event, verifies the tag matches `^v[0-9]+\.[0-9]+\.[0-9]+$`, and force-moves `v<MAJOR>` to the same commit. Consumers pinned to `@vMAJOR` pick up the release on their next workflow run.
+
+If you publish a prerelease (e.g. `v2.0.0-rc1`) the release workflow skips the major-tag update, so the moving tag isn't polluted by prereleases.
+
+### Manually rebuilding `dist/` from a workflow
+
+If you want to rebuild `dist/` without doing it locally (for example after a Dependabot PR merges into `main`), trigger the `Build dist` workflow from the Actions tab (`workflow_dispatch`). It runs `npm ci && npm run build` and commits any resulting change to the default branch.
+
+### Dependency updates
+
+Dependabot opens PRs automatically:
+
+- `github-actions` — weekly. Keeps `actions/checkout`, `actions/setup-node`, etc. on the latest major.
+- `npm` — monthly. Bumps `@actions/core`, `@actions/github`, `@vercel/ncc`.
+
+After merging a Dependabot PR, run **Build dist** (or do it locally) so the bundled `dist/index.js` reflects the new dependency versions.
