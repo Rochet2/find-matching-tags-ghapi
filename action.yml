@@ -2,8 +2,12 @@ name: 'Filter tags'
 description: 'Find / filter / search / query repository tags with regex'
 inputs:
   regex:
-    description: 'regex to match a tag with'
+    description: 'regex pattern to match a tag with'
     required: true
+  flags:
+    description: 'regex flags applied to the pattern (e.g. "i" for case-insensitive)'
+    required: false
+    default: ''
   owner:
     description: 'repository owner username or organization name'
     required: true
@@ -11,24 +15,33 @@ inputs:
     description: 'repository name'
     required: true
   token:
-    description: 'github token used to authenticate API user. see https://docs.github.com/en/rest/overview/resources-in-the-rest-api#requests-from-github-actions'
-    required: true
+    description: 'github token used to authenticate API calls. Defaults to the workflow token. See https://docs.github.com/en/rest/overview/resources-in-the-rest-api#requests-from-github-actions'
+    required: false
+    default: ${{ github.token }}
   per_page:
-    description: 'amount of results per page to fetch, between [1,100]'
+    description: 'results per page to fetch, between [1,100]'
     required: false
     default: '30'
   page:
-    description: 'page number to fetch from'
+    description: 'page number to fetch from (ignored when paginate is true)'
     required: false
     default: '1'
+  paginate:
+    description: 'when true, fetch every tag across all pages (ignores the page input)'
+    required: false
+    default: 'false'
   sort:
-    description: 'sorting of output tags, asc or desc'
+    description: 'sort order of output tags, asc or desc'
     required: false
     default: 'asc'
 outputs:
   tags:
     description: 'JSON array of the matched tags'
+  count:
+    description: 'number of matched tags'
 runs:
-  using: 'node20'
-  main: 'index.js'
-
+  using: 'node24'
+  main: 'dist/index.js'
+branding:
+  icon: 'tag'
+  color: 'blue'

@@ -1,9 +1,11 @@
 {
   "name": "find-matching-tags-ghapi",
   "version": "1.0.0",
+  "type": "module",
   "description": "Allows using regex to find matching tags from github tags of a repository using github API",
   "main": "index.js",
   "scripts": {
+    "build": "ncc build index.js -o dist --license licenses.txt",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -18,7 +20,10 @@
   },
   "homepage": "https://github.com/Rochet2/find-matching-tags-ghapi#readme",
   "dependencies": {
-    "@actions/core": "^1.10.1",
-    "@actions/github": "^6.0.0"
+    "@actions/core": "^3.0.1",
+    "@actions/github": "^9.1.1"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.38.4"
   }
 }
