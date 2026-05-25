@@ -1,5 +1,14 @@
 name: Build dist
 on:
+  # Auto-rebuild dist when source changes land on main. Triggering manually
+  # (or on a feature/dependabot branch) is also supported via workflow_dispatch.
+  push:
+    branches: [main]
+    paths:
+      - 'index.js'
+      - 'action.yml'
+      - 'package.json'
+      - 'package-lock.json'
   workflow_dispatch:
 
 permissions:
