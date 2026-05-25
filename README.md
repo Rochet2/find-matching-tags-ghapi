@@ -38,16 +38,24 @@ This action lets you filter a repository's tags by regex using the GitHub API.
     # token: ${{ secrets.GITHUB_TOKEN }}
 
 - name: Assert tags
-  uses: nick-fields/assert-action@ed2cc40e8584b4abbce95fc9dd291391c685443f
-  with:
-    expected: '["TEST-1","TEST-2","TEST-3"]'
-    actual: ${{ steps.find_matching_tags.outputs.tags }}
+  env:
+    ACTUAL: ${{ steps.find_matching_tags.outputs.tags }}
+    EXPECTED: '["TEST-1","TEST-2","TEST-3"]'
+  run: |
+    if [ "$ACTUAL" != "$EXPECTED" ]; then
+      echo "::error::Expected $EXPECTED, got $ACTUAL"
+      exit 1
+    fi
 
 - name: Print outputs
-  run: echo "Output ${{ steps.find_matching_tags.outputs.tags }}"
+  env:
+    TAGS: ${{ steps.find_matching_tags.outputs.tags }}
+  run: echo "Output $TAGS"
 
 - name: Print first tag
-  run: echo ${{ fromJson(steps.find_matching_tags.outputs.tags)[0] }}
+  env:
+    TAGS: ${{ steps.find_matching_tags.outputs.tags }}
+  run: echo "$TAGS" | jq -r '.[0]'
 ```
 
 ### Fetch every matching tag across all pages
@@ -73,6 +81,18 @@ This action lets you filter a repository's tags by regex using the GitHub API.
     owner: Rochet2
     repo: find-matching-tags-ghapi
 ```
+
+## Versioning
+
+Pin to the moving major-version tag (`@v1`) to automatically get backward-compatible bug fixes and improvements:
+
+```yml
+uses: Rochet2/find-matching-tags-ghapi@v1
+```
+
+If you want to pin to an exact release instead, use the full tag (`@v1.2.0`) or a commit SHA.
+
+The `v<MAJOR>` tag is moved automatically by `.github/workflows/release.yml` whenever a `vX.Y.Z` release is published.
 
 ## Development
 

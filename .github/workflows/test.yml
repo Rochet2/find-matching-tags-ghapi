@@ -30,6 +30,7 @@ jobs:
     needs: verify_build
     steps:
       - uses: actions/checkout@v6
+
       - name: Find matching tags asc
         id: find_matching_tags_asc
         uses: ./
@@ -38,14 +39,17 @@ jobs:
           sort: asc
           owner: Rochet2
           repo: find-matching-tags-ghapi
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Print outputs asc
-        run: echo "Output ${{ steps.find_matching_tags_asc.outputs.tags }}"
-      - name: Test outputs asc
-        uses: nick-fields/assert-action@1e012cc9f1bf73ccc96470b56c8887478c647e8a
-        with:
-          expected: '["TEST-1","TEST-2","TEST-3"]'
-          actual: ${{ steps.find_matching_tags_asc.outputs.tags }}
+
+      - name: Assert asc output
+        env:
+          ACTUAL: ${{ steps.find_matching_tags_asc.outputs.tags }}
+          EXPECTED: '["TEST-1","TEST-2","TEST-3"]'
+        run: |
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
+
       - name: Find matching tags desc
         id: find_matching_tags_desc
         uses: ./
@@ -54,16 +58,25 @@ jobs:
           sort: desc
           owner: Rochet2
           repo: find-matching-tags-ghapi
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Print outputs desc
-        run: echo "Output ${{ steps.find_matching_tags_desc.outputs.tags }}"
-      - name: Test outputs desc
-        uses: nick-fields/assert-action@1e012cc9f1bf73ccc96470b56c8887478c647e8a
-        with:
-          expected: '["TEST-3","TEST-2","TEST-1"]'
-          actual: ${{ steps.find_matching_tags_desc.outputs.tags }}
-      - name: Test print first element of asc and desc output
-        run: echo ${{ fromJson(steps.find_matching_tags_asc.outputs.tags)[0] }} ${{ fromJson(steps.find_matching_tags_desc.outputs.tags)[0] }}
+
+      - name: Assert desc output
+        env:
+          ACTUAL: ${{ steps.find_matching_tags_desc.outputs.tags }}
+          EXPECTED: '["TEST-3","TEST-2","TEST-1"]'
+        run: |
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
+
+      - name: Print first element of asc and desc output
+        env:
+          ASC_TAGS: ${{ steps.find_matching_tags_asc.outputs.tags }}
+          DESC_TAGS: ${{ steps.find_matching_tags_desc.outputs.tags }}
+        run: |
+          echo "asc first:  $(echo "$ASC_TAGS"  | jq -r '.[0]')"
+          echo "desc first: $(echo "$DESC_TAGS" | jq -r '.[0]')"
+
       - name: Find matching tags case-insensitive via flags
         id: find_matching_tags_ci
         uses: ./
@@ -73,13 +86,23 @@ jobs:
           sort: asc
           owner: Rochet2
           repo: find-matching-tags-ghapi
-      - name: Test case-insensitive flag works
-        uses: nick-fields/assert-action@1e012cc9f1bf73ccc96470b56c8887478c647e8a
-        with:
-          expected: '["TEST-1","TEST-2","TEST-3"]'
-          actual: ${{ steps.find_matching_tags_ci.outputs.tags }}
-      - name: Verify count output
-        uses: nick-fields/assert-action@1e012cc9f1bf73ccc96470b56c8887478c647e8a
-        with:
-          expected: '3'
-          actual: ${{ steps.find_matching_tags_ci.outputs.count }}
+
+      - name: Assert case-insensitive flag works
+        env:
+          ACTUAL: ${{ steps.find_matching_tags_ci.outputs.tags }}
+          EXPECTED: '["TEST-1","TEST-2","TEST-3"]'
+        run: |
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
+
+      - name: Assert count output
+        env:
+          ACTUAL: ${{ steps.find_matching_tags_ci.outputs.count }}
+          EXPECTED: '3'
+        run: |
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
