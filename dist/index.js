@@ -1,4 +1,4 @@
-import './sourcemap-register.cjs';import { createRequire as __WEBPACK_EXTERNAL_createRequire } from "module";
+import { createRequire as __WEBPACK_EXTERNAL_createRequire } from "module";
 /******/ var __webpack_modules__ = ({
 
 /***/ 9659:
@@ -36413,5 +36413,3 @@ main();
 
 var __webpack_exports__filterAndSortTags = __webpack_exports__.F;
 export { __webpack_exports__filterAndSortTags as filterAndSortTags };
-
-//# sourceMappingURL=index.js.map
