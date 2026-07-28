@@ -20,13 +20,24 @@ const normalizeSort = (raw) => {
   return sort;
 };
 
+// Full x.y.z forms outrank coerced majors like "v2" when the numeric version is equal.
+const versionSpecificity = (tag) => {
+  const cleaned = String(tag).replace(/^v/i, '');
+  if (semver.valid(cleaned)) return 2;
+  if (semver.coerce(tag)) return 1;
+  return 0;
+};
+
 const compareSemver = (a, b) => {
   const aa = semver.coerce(a);
   const bb = semver.coerce(b);
   if (!aa && !bb) return a.localeCompare(b);
   if (!aa) return 1;
   if (!bb) return -1;
-  return semver.compare(aa, bb);
+  const cmp = semver.compare(aa, bb);
+  if (cmp !== 0) return cmp;
+  // Ascending: less-specific first (v2 before v2.0.0). Descending flips this.
+  return versionSpecificity(a) - versionSpecificity(b);
 };
 
 export const filterAndSortTags = (tags, regex, flags, sort) => {
@@ -34,8 +45,10 @@ export const filterAndSortTags = (tags, regex, flags, sort) => {
   const matched = tags.map((t) => t.name).filter((name) => pattern.test(name));
 
   if (sort === 'semver' || sort === 'semver-desc') {
-    matched.sort(compareSemver);
-    if (sort === 'semver-desc') matched.reverse();
+    matched.sort((a, b) => {
+      const cmp = compareSemver(a, b);
+      return sort === 'semver-desc' ? -cmp : cmp;
+    });
   } else {
     matched.sort();
     if (sort === 'desc') matched.reverse();
