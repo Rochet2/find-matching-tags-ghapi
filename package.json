@@ -1,29 +1,38 @@
 {
   "name": "find-matching-tags-ghapi",
-  "version": "1.0.0",
   "type": "module",
-  "description": "Allows using regex to find matching tags from github tags of a repository using github API",
+  "description": "GitHub Action to filter a repository's tags by regex using the GitHub API",
   "main": "index.js",
   "scripts": {
     "build": "ncc build index.js -o dist --license licenses.txt",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --check index.js"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/Rochet2/find-matching-tags-ghapi.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "github-actions",
+    "tags",
+    "semver",
+    "regex",
+    "filter"
+  ],
+  "author": "Rochet2",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/Rochet2/find-matching-tags-ghapi/issues"
   },
   "homepage": "https://github.com/Rochet2/find-matching-tags-ghapi#readme",
+  "engines": {
+    "node": ">=24"
+  },
   "dependencies": {
     "@actions/core": "^3.0.1",
-    "@actions/github": "^9.1.1"
+    "@actions/github": "^9.1.1",
+    "semver": "^7.8.5"
   },
   "devDependencies": {
-    "@vercel/ncc": "^0.38.4"
+    "@vercel/ncc": "^0.44.1"
   }
 }

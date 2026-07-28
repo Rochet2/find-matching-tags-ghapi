@@ -1,15 +1,22 @@
 name: Build dist
+
 on:
-  # Auto-rebuild dist when source changes land on main. Triggering manually
-  # (or on a feature/dependabot branch) is also supported via workflow_dispatch.
+  # Auto-rebuild dist when source/deps change on main or Dependabot branches.
+  # Manual trigger still available for any branch via workflow_dispatch.
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'dependabot/**'
     paths:
       - 'index.js'
       - 'action.yml'
       - 'package.json'
       - 'package-lock.json'
   workflow_dispatch:
+
+concurrency:
+  group: build-dist-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -22,9 +29,11 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          # Needed so Dependabot branch pushes can authenticate when pushing dist
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -37,8 +46,8 @@ jobs:
 
       - name: Commit dist if changed
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           git add -f dist
           git diff-index --quiet HEAD || git commit -m "Rebuild dist"
 

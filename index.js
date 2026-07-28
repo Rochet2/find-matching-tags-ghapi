@@ -1,5 +1,8 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
+import semver from 'semver';
+
+const ALLOWED_SORTS = new Set(['asc', 'desc', 'semver', 'semver-desc']);
 
 const parseIntInRange = (name, value, { min = 1, max = Number.MAX_SAFE_INTEGER } = {}) => {
   const parsed = Number.parseInt(value, 10);
@@ -11,23 +14,51 @@ const parseIntInRange = (name, value, { min = 1, max = Number.MAX_SAFE_INTEGER }
 
 const normalizeSort = (raw) => {
   const sort = (raw || 'asc').toLowerCase();
-  if (sort !== 'asc' && sort !== 'desc') {
-    throw new Error(`Input "sort" must be 'asc' or 'desc', got "${raw}"`);
+  if (!ALLOWED_SORTS.has(sort)) {
+    throw new Error(`Input "sort" must be one of ${[...ALLOWED_SORTS].join(', ')}, got "${raw}"`);
   }
   return sort;
+};
+
+// Full x.y.z forms outrank coerced majors like "v2" when the numeric version is equal.
+const versionSpecificity = (tag) => {
+  const cleaned = String(tag).replace(/^v/i, '');
+  if (semver.valid(cleaned)) return 2;
+  if (semver.coerce(tag)) return 1;
+  return 0;
+};
+
+const compareSemver = (a, b) => {
+  const aa = semver.coerce(a);
+  const bb = semver.coerce(b);
+  if (!aa && !bb) return a.localeCompare(b);
+  if (!aa) return 1;
+  if (!bb) return -1;
+  const cmp = semver.compare(aa, bb);
+  if (cmp !== 0) return cmp;
+  // Ascending: less-specific first (v2 before v2.0.0). Descending flips this.
+  return versionSpecificity(a) - versionSpecificity(b);
 };
 
 export const filterAndSortTags = (tags, regex, flags, sort) => {
   const pattern = new RegExp(regex, flags || '');
   const matched = tags.map((t) => t.name).filter((name) => pattern.test(name));
-  matched.sort();
-  return sort === 'desc' ? matched.reverse() : matched;
+
+  if (sort === 'semver' || sort === 'semver-desc') {
+    matched.sort((a, b) => {
+      const cmp = compareSemver(a, b);
+      return sort === 'semver-desc' ? -cmp : cmp;
+    });
+  } else {
+    matched.sort();
+    if (sort === 'desc') matched.reverse();
+  }
+
+  return matched;
 };
 
 const main = async () => {
   try {
-    const owner = core.getInput('owner', { required: true, trimWhitespace: true });
-    const repo = core.getInput('repo', { required: true, trimWhitespace: true });
     const token = core.getInput('token', { required: true, trimWhitespace: true });
     const regex = core.getInput('regex', { required: true });
     const flags = core.getInput('flags');
@@ -35,6 +66,10 @@ const main = async () => {
     const paginate = core.getBooleanInput('paginate');
     const per_page = parseIntInRange('per_page', core.getInput('per_page'), { min: 1, max: 100 });
     const page = parseIntInRange('page', core.getInput('page'), { min: 1 });
+
+    const contextRepo = github.context.repo;
+    const owner = core.getInput('owner', { trimWhitespace: true }) || contextRepo.owner;
+    const repo = core.getInput('repo', { trimWhitespace: true }) || contextRepo.repo;
 
     // Hide the token from logs even when callers pass it explicitly
     core.setSecret(token);

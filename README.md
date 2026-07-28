@@ -8,13 +8,13 @@ This action lets you filter a repository's tags by regex using the GitHub API.
 | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------- |
 | regex     | regex pattern to match a tag with                                                                                                                                                        | true     |                      |
 | flags     | regex flags applied to the pattern (e.g. `i` for case-insensitive)                                                                                                                       | false    | ``                   |
-| owner     | repository owner username or organization name                                                                                                                                           | true     |                      |
-| repo      | repository name                                                                                                                                                                          | true     |                      |
+| owner     | repository owner username or organization name. Defaults to the repository of the calling workflow                                                                                       | false    | current repo owner   |
+| repo      | repository name. Defaults to the repository of the calling workflow                                                                                                                      | false    | current repo name    |
 | token     | github token used to authenticate API calls. See [docs](https://docs.github.com/en/rest/overview/resources-in-the-rest-api#requests-from-github-actions). Defaults to the workflow token | false    | `${{ github.token }}` |
-| per_page  | results per page to fetch, between [1,100]                                                                                                                                               | false    | `30`                 |
+| per_page  | results per page to fetch, between [1,100]                                                                                                                                               | false    | `100`                |
 | page      | page number to fetch from (ignored when `paginate` is true)                                                                                                                              | false    | `1`                  |
-| paginate  | when true, fetch every tag across all pages (ignores the `page` input)                                                                                                                   | false    | `false`              |
-| sort      | sort order of output tags, `asc` or `desc`                                                                                                                                               | false    | `asc`                |
+| paginate  | when true, fetch every tag across all pages (ignores the `page` input)                                                                                                                   | false    | `true`               |
+| sort      | sort order: `asc` / `desc` (alphabetical) or `semver` / `semver-desc`                                                                                                                    | false    | `asc`                |
 
 ## Outputs
 
@@ -28,14 +28,11 @@ This action lets you filter a repository's tags by regex using the GitHub API.
 ```yml
 - name: Find matching tags
   id: find_matching_tags
-  uses: Rochet2/find-matching-tags-ghapi@v1
+  uses: Rochet2/find-matching-tags-ghapi@v2
   with:
     regex: ^TEST.*
     sort: asc
-    owner: Rochet2
-    repo: find-matching-tags-ghapi
-    # token defaults to ${{ github.token }} so this line is optional
-    # token: ${{ secrets.GITHUB_TOKEN }}
+    # owner, repo, and token all default to the current workflow context
 
 - name: Assert tags
   env:
@@ -58,39 +55,53 @@ This action lets you filter a repository's tags by regex using the GitHub API.
   run: echo "$TAGS" | jq -r '.[0]'
 ```
 
-### Fetch every matching tag across all pages
+### Semver sort
 
 ```yml
-- name: Find all matching tags
-  uses: Rochet2/find-matching-tags-ghapi@v1
+- name: Latest matching release tag
+  id: latest
+  uses: Rochet2/find-matching-tags-ghapi@v2
   with:
     regex: ^v\d+\.\d+\.\d+$
-    paginate: 'true'
-    owner: Rochet2
-    repo: find-matching-tags-ghapi
+    sort: semver-desc
+
+- name: Use latest
+  env:
+    TAG: ${{ fromJson(steps.latest.outputs.tags)[0] }}
+  run: echo "Latest is $TAG"
 ```
 
 ### Case-insensitive match
 
 ```yml
 - name: Find matching tags (case-insensitive)
-  uses: Rochet2/find-matching-tags-ghapi@v1
+  uses: Rochet2/find-matching-tags-ghapi@v2
   with:
     regex: ^test-.*
     flags: i
-    owner: Rochet2
-    repo: find-matching-tags-ghapi
+```
+
+### Single page only
+
+```yml
+- name: First page of tags only
+  uses: Rochet2/find-matching-tags-ghapi@v2
+  with:
+    regex: ^v
+    paginate: 'false'
+    per_page: 30
+    page: 1
 ```
 
 ## Versioning
 
-Pin to the moving major-version tag (`@v1`) to automatically get backward-compatible bug fixes and improvements:
+Pin to the moving major-version tag (`@v2`) to automatically get backward-compatible bug fixes and improvements:
 
 ```yml
-uses: Rochet2/find-matching-tags-ghapi@v1
+uses: Rochet2/find-matching-tags-ghapi@v2
 ```
 
-If you want to pin to an exact release instead, use the full tag (`@v1.2.0`) or a commit SHA.
+If you want to pin to an exact release instead, use the full tag (`@v2.0.0`) or a commit SHA. The older `@v1` line remains available for legacy consumers but will not receive new features.
 
 The `v<MAJOR>` tag is moved automatically by `.github/workflows/release.yml` whenever a `vX.Y.Z` release is published.
 
@@ -102,25 +113,14 @@ The `v<MAJOR>` tag is moved automatically by `.github/workflows/release.yml` whe
 2. Pick a tag in semver form: `vX.Y.Z` (patch for fixes, minor for additive changes, major for anything that can break consumers).
 3. Click **Publish release**.
 
-The `Update major-version tag` workflow then moves `v<MAJOR>` to the same commit, so consumers pinned to `@v1` automatically pick up the release. Prereleases like `v2.0.0-rc1` are intentionally ignored by the major-tag mover.
+The **Update major-version tag** workflow then moves `v<MAJOR>` to the same commit, so consumers pinned to `@v2` automatically pick up the release. Prereleases like `v2.0.0-rc1` are intentionally ignored by the major-tag mover.
 
 ### When `dist/` falls out of sync
 
-`dist/index.js` is the bundled output that GitHub actually runs. It is rebuilt automatically by the **Build dist** workflow whenever `index.js`, `action.yml`, or the `package.json` / `package-lock.json` files change on `main`.
+`dist/index.js` is the bundled output that GitHub actually runs. It is rebuilt automatically by the **Build dist** workflow whenever `index.js`, `action.yml`, or the lockfile change on `main` or on a Dependabot branch.
 
-You only have to touch this yourself in two situations:
-
-- **CI tells you `dist/ is out of date` on a PR** — open the **Actions** tab, choose **Build dist**, click **Run workflow**, and pick the PR's branch. It rebuilds `dist/` and commits to the branch, after which CI will re-run and pass.
-- **You merged a Dependabot PR and want the new deps reflected immediately** — same thing, but run **Build dist** on `main`.
-
-If you ever want to do it locally instead:
-
-```sh
-npm ci
-npm run build
-git add dist && git commit -m "Rebuild dist"
-```
+You only have to touch this yourself when CI says `dist/ is out of date` on a non-Dependabot PR: open **Actions → Build dist → Run workflow** and pick that branch.
 
 ### Dependency updates
 
-Dependabot opens PRs automatically — `github-actions` weekly, `npm` monthly. The flow above ("run Build dist on the PR branch") applies to those PRs too.
+Dependabot opens PRs automatically — `github-actions` weekly, `npm` monthly. On Dependabot branches, **Build dist** runs itself after the lockfile changes, so you usually just merge when CI is green.
