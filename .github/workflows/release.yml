@@ -6,6 +6,10 @@ on:
   release:
     types: [published]
 
+concurrency:
+  group: release-major-tag
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -28,7 +32,7 @@ jobs:
           fi
           MAJOR="$(echo "$RELEASE_TAG" | cut -d. -f1)"
           echo "Pointing $MAJOR at $RELEASE_SHA ($RELEASE_TAG)"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config user.name  "github-actions[bot]"
           git tag -f "$MAJOR" "$RELEASE_SHA"
           git push -f origin "$MAJOR"

@@ -1,4 +1,10 @@
+name: Test
+
 on: [push, pull_request]
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -9,7 +15,7 @@ jobs:
     name: Verify dist is up to date
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -18,7 +24,7 @@ jobs:
       - name: Check dist is committed
         run: |
           if [ -n "$(git status --porcelain dist)" ]; then
-            echo "dist/ is out of date. Run 'npm run build' and commit the changes." >&2
+            echo "dist/ is out of date. Run the Build dist workflow on this branch, or locally: npm ci && npm run build" >&2
             git status --porcelain dist
             git --no-pager diff dist
             exit 1
@@ -37,8 +43,7 @@ jobs:
         with:
           regex: ^TEST\-.*
           sort: asc
-          owner: Rochet2
-          repo: find-matching-tags-ghapi
+          # owner/repo default to this repository
 
       - name: Assert asc output
         env:
@@ -56,8 +61,6 @@ jobs:
         with:
           regex: ^TEST\-.*
           sort: desc
-          owner: Rochet2
-          repo: find-matching-tags-ghapi
 
       - name: Assert desc output
         env:
@@ -84,8 +87,6 @@ jobs:
           regex: ^test\-.*
           flags: i
           sort: asc
-          owner: Rochet2
-          repo: find-matching-tags-ghapi
 
       - name: Assert case-insensitive flag works
         env:
@@ -104,5 +105,22 @@ jobs:
         run: |
           if [ "$ACTUAL" != "$EXPECTED" ]; then
             echo "::error::Expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
+
+      - name: Find matching tags with semver-desc sort
+        id: find_matching_tags_semver
+        uses: ./
+        with:
+          regex: ^v
+          sort: semver-desc
+
+      - name: Assert semver-desc puts v2.0.0 first
+        env:
+          ACTUAL: ${{ steps.find_matching_tags_semver.outputs.tags }}
+        run: |
+          FIRST="$(echo "$ACTUAL" | jq -r '.[0]')"
+          if [ "$FIRST" != "v2.0.0" ]; then
+            echo "::error::Expected first tag v2.0.0, got $FIRST (full: $ACTUAL)"
             exit 1
           fi
